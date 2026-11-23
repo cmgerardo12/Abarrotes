@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="amber">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Abarrotes Core • POS Titanium Enterprise v9.0</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <!-- PANTALLA DE APERTURA DE TURNO (LOGIN POR PIN) -->
+    <div id="pantallaLogin" class="login-overlay">
+        <div class="login-card">
+            <div class="login-brand">
+                <h1 id="loginNombreTienda">ABARROTES CORE</h1>
+                <p>Titanium Enterprise v9.0 • 100 SKUs & 20 Rutas</p>
+            </div>
+            <form id="formLogin">
+                <div class="form-group">
+                    <label>Operador de Turno</label>
+                    <select id="loginOperador">
+                        <option value="Gerardo Caballero">Gerardo Caballero (Administrador)</option>
+                        <option value="Encargado Turno">Encargado de Turno (Administrador)</option>
+                        <option value="Cajero Matutino">Cajero Matutino (Solo Caja)</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>PIN de Acceso</label>
+                        <input type="password" id="loginPin" placeholder="1234 / 0000" maxlength="4" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Fondo Inicial ($)</label>
+                        <input type="number" id="loginFondo" step="0.50" value="500.00" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Meta de Venta del Día ($)</label>
+                    <input type="number" id="loginMeta" step="50" value="4500.00" required>
+                </div>
+                <button type="submit" class="btn btn-accent full-width">Abrir Turno y Entrar a Caja</button>
+            </form>
+            <p class="login-hint">PIN Admin: <strong>1234</strong> • PIN Cajero: <strong>0000</strong></p>
+        </div>
+    </div>
+
+    <div id="sidebarBackdrop" class="sidebar-backdrop hidden no-print"></div>
+
+    <div class="app-layout">
+        <!-- BARRA LATERAL -->
+        <aside id="sidebarMenu" class="sidebar no-print">
+            <div class="brand">
+                <h1 id="sidebarNombreTienda">ABARROTES CORE</h1>
+                <span>Titanium POS v9.0</span>
+            </div>
+
+            <div class="operator-badge">
+                <div class="op-info">
+                    <strong id="lblOperador">Gerardo Caballero</strong>
+                    <span id="lblRol" class="badge badge-warning">ADMIN</span>
+                </div>
+                <button id="btnCerrarSesion" class="btn-icon-sm" title="Bloquear / Cambiar Turno">🔒</button>
+            </div>
+
+            <nav class="nav-menu">
+                <button class="tab-btn active" data-tab="pos">
+                    <span>Punto de Venta</span>
+                    <kbd>F2</kbd>
+                </button>
+                <button class="tab-btn" data-tab="inventario">
+                    <span>Inventario (100)</span>
+                    <span id="navBadgeStock" class="nav-pill">0</span>
+                </button>
+                <button class="tab-btn" data-tab="combos">
+                    <span>Combos y Ofertas</span>
+                </button>
+                <button class="tab-btn" data-tab="fiado">
+                    <span>Créditos y Fiado</span>
+                </button>
+                <button class="tab-btn" data-tab="proveedores">
+                    <span>Proveedores (20)</span>
+                </button>
+                <button class="tab-btn" data-tab="reportes">
+                    <span>Corte Z y Arqueo</span>
+                </button>
+                <button class="tab-btn admin-only-btn" data-tab="ajustes">
+                    <span>Configuración</span>
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button id="btnCmdPalette" class="cmd-trigger">
+                    <span>⚡ Acciones rápidas</span>
+                    <kbd>Ctrl K</kbd>
+                </button>
+                <div class="status-dot"><span></span> <small id="indicadorFondo">Fondo: $500.00</small></div>
+            </div>
+        </aside>
+
+        <!-- CONTENIDO PRINCIPAL -->
+        <main class="main-area">
+            <header class="topbar no-print">
+                <div class="topbar-left">
+                    <button type="button" id="btnMenuMovil" class="btn btn-outline btn-sm mobile-menu-btn" aria-label="Abrir menú">☰ Menú</button>
+                    <h2 id="tituloModuloActual">Terminal de Punto de Venta</h2>
+                </div>
+                <div class="topbar-meta">
+                    <div class="goal-widget" title="Progreso hacia la meta del día">
+                        <span id="lblMetaProgreso" class="mono">Meta: $0 / $4,500 (0%)</span>
+                        <div class="goal-track"><div id="metaFill" class="goal-fill" style="width: 0%;"></div></div>
+                    </div>
+                    <button id="btnToggleTheme" class="btn btn-outline btn-sm" title="Cambiar Acento Visual">🎨 Tema</button>
+                    <button id="btnFullscreen" class="btn btn-outline btn-sm hide-on-mobile" title="Pantalla Completa">⛶</button>
+                    <span id="relojSistema" class="clock-pill mono hide-on-mobile">00:00:00</span>
+                    <span class="folio-pill mono">FOLIO: <strong id="folioActual">V-0001</strong></span>
+                </div>
+            </header>
+
+            <!-- MÓDULO 1: PUNTO DE VENTA -->
+            <section id="pos" class="tab-content active">
+                <div class="pos-grid">
+                    <!-- Catálogo -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div>
+                                <h3>Catálogo Rápido</h3>
+                                <span id="subtituloCatalogoPOS" class="subtitle">100 SKUs disponibles • Mayoreo automático</span>
+                            </div>
+                            <div class="pos-tools-group">
+                                <button type="button" id="btnRecargas" class="btn btn-outline btn-sm" title="Cobrar Recarga Telefónica">📱 Recarga</button>
+                                <button type="button" id="btnEnvase" class="btn btn-outline btn-sm" title="Cobrar Importe de Envase">🍾 Envase</button>
+                                <button type="button" id="btnVentaLibre" class="btn btn-outline btn-sm" title="Cobrar producto no registrado">+ Varios</button>
+                                <button type="button" id="btnToggleVistaPOS" class="btn btn-outline btn-sm" title="Cambiar vista">☰ Compacta</button>
+                            </div>
+                        </div>
+
+                        <div class="search-scanner-bar">
+                            <input type="text" id="buscarProductoPOS" class="search-input" placeholder="Escanear lector USB o buscar entre 100 productos (F2)..." autofocus>
+                            <button type="button" id="btnAbrirCamara" class="btn btn-accent">📷 Escanear</button>
+                        </div>
+
+                        <div id="fastAccessBar" class="fast-access-bar"></div>
+
+                        <div class="category-pills" id="filtroCategoriasPOS">
+                            <button class="cat-pill active" data-cat="Todas">Todas</button>
+                            <button class="cat-pill" data-cat="Combos">🔥 Combos</button>
+                            <button class="cat-pill" data-cat="Bebidas">Bebidas</button>
+                            <button class="cat-pill" data-cat="Lácteos">Lácteos</button>
+                            <button class="cat-pill" data-cat="Abarrotes">Abarrotes</button>
+                            <button class="cat-pill" data-cat="Panadería">Panadería</button>
+                            <button class="cat-pill" data-cat="Botanas">Botanas</button>
+                            <button class="cat-pill" data-cat="Salchichonería">Salchichonería</button>
+                            <button class="cat-pill" data-cat="Frutas y Verduras">Frutas y Verduras</button>
+                            <button class="cat-pill" data-cat="Limpieza">Limpieza</button>
+                            <button class="cat-pill" data-cat="Higiene">Higiene</button>
+                        </div>
+
+                        <div id="listaProductosPOS" class="product-grid"></div>
+                    </div>
+
+                    <!-- Ticket y Cobro con Multi-Cuenta -->
+                    <div class="card ticket-panel">
+                        <div class="ticket-tabs-bar">
+                            <button class="ticket-slot-btn active" data-slot="0">Cliente 1</button>
+                            <button class="ticket-slot-btn" data-slot="1">Cliente 2</button>
+                            <button class="ticket-slot-btn" data-slot="2">Cliente 3</button>
+                        </div>
+
+                        <div class="table-container">
+                            <table class="ticket-table">
+                                <thead>
+                                    <tr>
+                                        <th>Producto</th>
+                                        <th style="text-align:center;">Cant.</th>
+                                        <th>Subt.</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="cuerpoCarrito"></tbody>
+                            </table>
+                        </div>
+
+                        <div class="checkout-section">
+                            <div class="summary-row">
+                                <span>Artículos / Ahorro Mayoreo:</span>
+                                <strong id="totalArticulos" class="mono">0</strong>
+                            </div>
+
+                            <div class="discount-row">
+                                <label>Descuento Global (%):</label>
+                                <input type="number" id="inputDescuento" min="0" max="50" value="0" class="discount-input mono">
+                            </div>
+
+                            <div class="total-box">
+                                <span>TOTAL A COBRAR</span>
+                                <strong id="totalVenta" class="mono">$0.00</strong>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Método de Pago</label>
+                                <select id="metodoPago">
+                                    <option value="efectivo">Efectivo en Caja</option>
+                                    <option value="transferencia">Transferencia / Tarjeta</option>
+                                    <option value="mixto">Mixto (Efectivo + Transf./Tarjeta)</option>
+                                    <option value="fiado">Crédito (Cuenta Fiado)</option>
+                                </select>
+                            </div>
+
+                            <div id="grupoEfectivo" class="form-group">
+                                <div style="display:flex; justify-content:space-between; align-items:center;">
+                                    <label id="lblMontoEfectivo">Efectivo Recibido ($)</label>
+                                    <button type="button" id="btnToggleNumpad" class="btn-link">⌨️ Teclado</button>
+                                </div>
+                                <input type="number" id="montoRecibido" step="0.50" placeholder="0.00" class="mono">
+                                <div class="quick-bills">
+                                    <button type="button" class="bill-btn mono" data-val="exacto">Exacto</button>
+                                    <button type="button" class="bill-btn mono" data-val="20">$20</button>
+                                    <button type="button" class="bill-btn mono" data-val="50">$50</button>
+                                    <button type="button" class="bill-btn mono" data-val="100">$100</button>
+                                    <button type="button" class="bill-btn mono" data-val="200">$200</button>
+                                    <button type="button" class="bill-btn mono" data-val="500">$500</button>
+                                </div>
+
+                                <div id="grupoMixtoExtra" class="mixto-box hidden">
+                                    <span>Monto en Transf. / Tarjeta:</span>
+                                    <strong id="montoMixtoTarjeta" class="mono">$0.00</strong>
+                                </div>
+
+                                <div id="numpadContainer" class="numpad-grid hidden">
+                                    <button type="button" class="num-key" data-k="7">7</button>
+                                    <button type="button" class="num-key" data-k="8">8</button>
+                                    <button type="button" class="num-key" data-k="9">9</button>
+                                    <button type="button" class="num-key" data-k="4">4</button>
+                                    <button type="button" class="num-key" data-k="5">5</button>
+                                    <button type="button" class="num-key" data-k="6">6</button>
+                                    <button type="button" class="num-key" data-k="1">1</button>
+                                    <button type="button" class="num-key" data-k="2">2</button>
+                                    <button type="button" class="num-key" data-k="3">3</button>
+                                    <button type="button" class="num-key" data-k="0">0</button>
+                                    <button type="button" class="num-key" data-k=".">.</button>
+                                    <button type="button" class="num-key danger-key" data-k="C">C</button>
+                                </div>
+                                <div class="cambio-box">
+                                    <span>Cambio a entregar:</span>
+                                    <strong id="cambioVenta" class="mono">$0.00</strong>
+                                </div>
+                            </div>
+
+                            <div id="grupoFiado" class="form-group hidden">
+                                <label>Seleccionar Cliente</label>
+                                <select id="clienteFiadoSelect"></select>
+                            </div>
+
+                            <div class="action-buttons">
+                                <button id="btnCancelarVenta" class="btn btn-outline">Limpiar</button>
+                                <button id="btnCobrar" class="btn btn-accent">Cobrar (F8)</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- MÓDULO 2: INVENTARIO, CADUCIDAD, MERMAS Y KARDEX -->
+            <section id="inventario" class="tab-content">
+                <div class="split-grid">
+                    <div class="card admin-only-panel">
+                        <h3>Registrar / Editar Producto</h3>
+                        <form id="formProducto">
+                            <input type="hidden" id="prodId">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Código / SKU</label>
+                                    <input type="text" id="prodCodigo" required placeholder="750201" class="mono">
+                                </div>
+                                <div class="form-group">
+                                    <label>Fecha Caducidad</label>
+                                    <input type="date" id="prodCaducidad" value="2027-06-01" required>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Nombre del Producto</label>
+                                <input type="text" id="prodNombre" required placeholder="Ej. Leche Lala 1L">
+                            </div>
+                            <div class="form-group">
+                                <label>URL de Imagen (Opcional)</label>
+                                <input type="url" id="prodImagen" placeholder="https://ejemplo.com/foto.png">
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Tipo de Venta</label>
+                                    <select id="prodTipo">
+                                        <option value="pieza">Por Pieza</option>
+                                        <option value="granel">A Granel (Kg)</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Categoría</label>
+                                    <select id="prodCategoria">
+                                        <option value="Abarrotes">Abarrotes</option>
+                                        <option value="Bebidas">Bebidas</option>
+                                        <option value="Lácteos">Lácteos</option>
+                                        <option value="Panadería">Panadería</option>
+                                        <option value="Botanas">Botanas</option>
+                                        <option value="Salchichonería">Salchichonería</option>
+                                        <option value="Frutas y Verduras">Frutas y Verduras</option>
+                                        <option value="Limpieza">Limpieza</option>
+                                        <option value="Higiene">Higiene</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Costo Compra ($)</label>
+                                    <input type="number" id="prodCosto" step="0.10" required class="mono">
+                                </div>
+                                <div class="form-group">
+                                    <label>Precio Menudeo ($)</label>
+                                    <input type="number" id="prodPrecio" step="0.10" required class="mono">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Precio Mayoreo ($)</label>
+                                    <input type="number" id="prodMayoreo" step="0.10" placeholder="Opcional" class="mono">
+                                </div>
+                                <div class="form-group">
+                                    <label>A partir de (Cant.)</label>
+                                    <input type="number" id="prodCantMayoreo" step="1" value="6" class="mono">
+                                </div>
+                            </div>
+                            <div id="previewMargen" class="margin-preview mono">Margen estimado: 0.0% ($0.00)</div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Existencia Actual</label>
+                                    <input type="number" id="prodStock" step="0.05" required class="mono">
+                                </div>
+                                <div class="form-group">
+                                    <label>Stock Mínimo</label>
+                                    <input type="number" id="prodMinimo" step="0.05" value="5" required class="mono">
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-accent full-width">Guardar Producto</button>
+                        </form>
+
+                        <hr class="divider">
+                        <h3>Entrada de Mercancía (Surtido)</h3>
+                        <form id="formEntradaStock">
+                            <div class="form-group">
+                                <label>Producto Surtido</label>
+                                <select id="entradaProdSelect"></select>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Cantidad recibida</label>
+                                    <input type="number" id="entradaCantidad" step="0.05" required class="mono">
+                                </div>
+                                <div class="form-group">
+                                    <label>Nueva Caducidad</label>
+                                    <input type="date" id="entradaCaducidad">
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-success-outline full-width">Sumar al Inventario</button>
+                        </form>
+
+                        <hr class="divider">
+                        <h3>Registrar Merma / Producto Dañado</h3>
+                        <form id="formMerma">
+                            <div class="form-group">
+                                <label>Producto Afectado</label>
+                                <select id="mermaProdSelect"></select>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Cantidad perdida</label>
+                                    <input type="number" id="mermaCantidad" step="0.05" required class="mono">
+                                </div>
+                                <div class="form-group">
+                                    <label>Motivo</label>
+                                    <select id="mermaMotivo">
+                                        <option value="Caducado">Producto Caducado</option>
+                                        <option value="Roto / Dañado">Envase Roto / Dañado</option>
+                                        <option value="Consumo Interno">Consumo Interno</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-danger full-width">Descontar Merma</button>
+                        </form>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Existencias, Lotes, Rotación y Caducidades</h3>
+                            <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
+                                <button id="btnImprimirPreciadores" class="btn btn-outline btn-sm">🏷️ Preciadores</button>
+                                <button id="btnExportarCSV" class="btn btn-outline btn-sm">📥 Excel (CSV)</button>
+                                <button id="btnOrdenCompra" class="btn btn-warning-outline btn-sm">Reorden Inteligente</button>
+                                <span id="badgeAlertaStock" class="badge badge-danger">0 Alertas</span>
+                            </div>
+                        </div>
+
+                        <div class="inv-filter-bar">
+                            <input type="text" id="buscarInventario" placeholder="Filtrar tabla por nombre o SKU..." class="search-input" style="margin:0;">
+                            <button type="button" class="btn btn-outline btn-sm inv-filter-btn active" data-invfilter="todos">Todos (100)</button>
+                            <button type="button" class="btn btn-outline btn-sm inv-filter-btn" data-invfilter="bajo">⚠️ Bajo Stock</button>
+                            <button type="button" class="btn btn-outline btn-sm inv-filter-btn" data-invfilter="caducar">⏳ Por Caducar</button>
+                            <button type="button" class="btn btn-outline btn-sm inv-filter-btn" data-invfilter="estancado">🐢 Baja Rotación</button>
+                        </div>
+
+                        <div class="table-container" style="max-height: 410px;">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>SKU</th>
+                                        <th>Producto</th>
+                                        <th>Menudeo / Mayoreo</th>
+                                        <th>Stock</th>
+                                        <th>Caducidad</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tablaInventarioBody"></tbody>
+                            </table>
+                        </div>
+
+                        <hr class="divider">
+                        <h3>Bitácora de Movimientos (Kardex en Tiempo Real)</h3>
+                        <div class="table-container" style="max-height: 220px;">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Hora</th>
+                                        <th>Movimiento</th>
+                                        <th>Producto</th>
+                                        <th>Cant.</th>
+                                        <th>Operador</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tablaKardexBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- MÓDULO 3: COMBOS Y PROMOCIONES -->
+            <section id="combos" class="tab-content">
+                <div class="split-grid">
+                    <div class="card admin-only-panel">
+                        <h3>Crear Paquete / Combo Promocional</h3>
+                        <p class="subtitle" style="margin-bottom: 1rem;">Descuenta automáticamente los productos individuales al venderse.</p>
+                        <form id="formCombo">
+                            <div class="form-group">
+                                <label>Nombre del Combo</label>
+                                <input type="text" id="comboNombre" required placeholder="Ej. Combo Lonche (Coca + Bimbo)">
+                            </div>
+                            <div class="form-group">
+                                <label>Producto 1</label>
+                                <select id="comboProd1"></select>
+                            </div>
+                            <div class="form-group">
+                                <label>Producto 2</label>
+                                <select id="comboProd2"></select>
+                            </div>
+                            <div class="form-group">
+                                <label>Precio Especial del Combo ($)</label>
+                                <input type="number" id="comboPrecio" step="0.50" required class="mono">
+                            </div>
+                            <button type="submit" class="btn btn-accent full-width">Publicar Combo en Caja</button>
+                        </form>
+                    </div>
+                    <div class="card">
+                        <h3>Combos Activos en Tienda</h3>
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Código</th>
+                                        <th>Promoción</th>
+                                        <th>Incluye</th>
+                                        <th>Precio</th>
+                                        <th>Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tablaCombosBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- MÓDULO 4: CRÉDITOS, FIADO Y ENVASES RETORNABLES -->
+            <section id="fiado" class="tab-content">
+                <div class="split-grid">
+                    <div class="card">
+                        <h3>Nuevo Cliente</h3>
+                        <form id="formCliente">
+                            <div class="form-group">
+                                <label>Nombre Completo</label>
+                                <input type="text" id="clienteNombre" required placeholder="Ej. Sra. Guadalupe López">
+                            </div>
+                            <div class="form-group">
+                                <label>Teléfono / WhatsApp (10 dígitos)</label>
+                                <input type="text" id="clienteTelefono" required placeholder="5512345678" class="mono">
+                            </div>
+                            <div class="form-group">
+                                <label>Límite de Crédito ($)</label>
+                                <input type="number" id="clienteLimite" value="500" required class="mono">
+                            </div>
+                            <button type="submit" class="btn btn-accent full-width">Registrar Cliente</button>
+                        </form>
+
+                        <hr class="divider">
+
+                        <h3>Registrar Abono</h3>
+                        <form id="formAbono">
+                            <div class="form-group">
+                                <label>Cliente Deudor</label>
+                                <select id="abonoClienteSelect"></select>
+                            </div>
+                            <div class="form-group">
+                                <label>Monto del Abono ($)</label>
+                                <input type="number" id="abonoMonto" step="0.50" required class="mono">
+                            </div>
+                            <button type="submit" class="btn btn-success-outline full-width">Aplicar Abono a Cuenta</button>
+                        </form>
+
+                        <hr class="divider">
+
+                        <h3>Control de Envases Retornables</h3>
+                        <form id="formEnvaseCliente">
+                            <div class="form-group">
+                                <label>Cliente</label>
+                                <select id="envaseClienteSelect"></select>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Tipo de Envase</label>
+                                    <select id="envaseTipo">
+                                        <option value="Refresco 2.5L">Refresco 2.5L</option>
+                                        <option value="Caguama">Caguama</option>
+                                        <option value="Garrafón 20L">Garrafón 20L</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Cantidad</label>
+                                    <input type="number" id="envaseCant" min="1" value="1" required class="mono">
+                                </div>
+                            </div>
+                            <div class="action-buttons" style="margin-top:0.25rem;">
+                                <button type="button" id="btnPrestarEnvase" class="btn btn-warning-outline btn-sm">Prestar (+)</button>
+                                <button type="button" id="btnDevolverEnvase" class="btn btn-success-outline btn-sm">Devolver (-)</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="card">
+                        <h3>Cartera de Clientes, Envases y Estados de Cuenta</h3>
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Cliente</th>
+                                        <th>Envases Prestados</th>
+                                        <th>Uso de Crédito</th>
+                                        <th>Disponible</th>
+                                        <th>Estado de Cuenta</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tablaClientesBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- MÓDULO 5: PROVEEDORES (20 RUTAS) Y COMPRAS / CUENTAS POR PAGAR -->
+            <section id="proveedores" class="tab-content">
+                <div class="split-grid">
+                    <div class="card admin-only-panel">
+                        <h3>Registrar Proveedor</h3>
+                        <form id="formProveedor">
+                            <div class="form-group">
+                                <label>Empresa / Marca</label>
+                                <input type="text" id="provEmpresa" required placeholder="Ej. Grupo Bimbo">
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Preventista / Contacto</label>
+                                    <input type="text" id="provContacto" required placeholder="Nombre">
+                                </div>
+                                <div class="form-group">
+                                    <label>Teléfono Ruta</label>
+                                    <input type="text" id="provTelefono" placeholder="5500000000" class="mono">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Línea de Productos</label>
+                                    <input type="text" id="provLinea" placeholder="Ej. Lácteos / Refrescos">
+                                </div>
+                                <div class="form-group">
+                                    <label>Día de Visita</label>
+                                    <select id="provDia">
+                                        <option value="Lunes">Lunes</option>
+                                        <option value="Martes">Martes</option>
+                                        <option value="Miércoles">Miércoles</option>
+                                        <option value="Jueves">Jueves</option>
+                                        <option value="Viernes">Viernes</option>
+                                        <option value="Sábado">Sábado</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-accent full-width">Guardar Proveedor</button>
+                        </form>
+
+                        <hr class="divider">
+
+                        <h3>Registrar Compra / Nota a Proveedor</h3>
+                        <form id="formCompraProveedor">
+                            <div class="form-group">
+                                <label>Proveedor</label>
+                                <select id="compraProvSelect"></select>
+                            </div>
+                            <div class="form-group">
+                                <label>Producto a Surtir</label>
+                                <select id="compraProdSelect"></select>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Cantidad</label>
+                                    <input type="number" id="compraCant" step="0.05" min="0.05" required class="mono">
+                                </div>
+                                <div class="form-group">
+                                    <label>Costo Total ($)</label>
+                                    <input type="number" id="compraMonto" step="0.50" min="0.50" required class="mono">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Condición de Pago</label>
+                                <select id="compraCondicion">
+                                    <option value="contado">Pagado de Contado (Sale de Caja)</option>
+                                    <option value="credito">A Crédito (Cuenta por Pagar)</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-success-outline full-width">Registrar Compra y Sumar Stock</button>
+                        </form>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Agenda Semanal de Rutas (20 Proveedores)</h3>
+                            <select id="filtroDiaProveedor" style="width:auto; padding:0.35rem 0.6rem;">
+                                <option value="Todos">Todos los días</option>
+                                <option value="Lunes">Lunes</option>
+                                <option value="Martes">Martes</option>
+                                <option value="Miércoles">Miércoles</option>
+                                <option value="Jueves">Jueves</option>
+                                <option value="Viernes">Viernes</option>
+                                <option value="Sábado">Sábado</option>
+                            </select>
+                        </div>
+                        <div class="table-container" style="max-height: 310px;">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Empresa</th>
+                                        <th>Contacto / Tel.</th>
+                                        <th>Línea</th>
+                                        <th>Visita</th>
+                                        <th>Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tablaProveedoresBody"></tbody>
+                            </table>
+                        </div>
+
+                        <hr class="divider">
+                        <h3>Compras y Cuentas por Pagar a Proveedores</h3>
+                        <div class="table-container" style="max-height: 220px;">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Proveedor</th>
+                                        <th>Detalle</th>
+                                        <th>Monto</th>
+                                        <th>Estatus</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tablaComprasProvBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- MÓDULO 6: CORTE Z, ARQUEO Y ANALÍTICA -->
+            <section id="reportes" class="tab-content">
+                <div class="card-header" style="margin-bottom: 1rem;">
+                    <h3>Resumen Financiero del Turno</h3>
+                    <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                        <button id="btnArqueoModal" class="btn btn-outline">🧮 Arqueo Billetes/Monedas</button>
+                        <button id="btnCorteZ" class="btn btn-accent">🧾 Imprimir Corte Z</button>
+                    </div>
+                </div>
+
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <span>VENTAS NETAS DEL DÍA</span>
+                        <h3 id="kpiVentasTotales" class="mono">$0.00</h3>
+                    </div>
+                    <div class="kpi-card">
+                        <span>EFECTIVO ESPERADO EN CAJÓN</span>
+                        <h3 id="kpiEfectivoCajon" class="mono">$500.00</h3>
+                    </div>
+                    <div class="kpi-card">
+                        <span>GASTOS Y MERMAS</span>
+                        <h3 id="kpiGastos" class="mono" style="color:var(--danger);">$0.00</h3>
+                    </div>
+                    <div class="kpi-card highlight-kpi">
+                        <span>UTILIDAD NETA REAL</span>
+                        <h3 id="kpiGanancia" class="mono">$0.00</h3>
+                    </div>
+                </div>
+
+                <div class="split-grid equal-grid">
+                    <div class="card">
+                        <h3>Ventas por Categoría (Tiempo Real)</h3>
+                        <canvas id="graficaCategorias" width="500" height="190"></canvas>
+                        <h3 style="margin-top: 1rem;">Horario Pico de Ventas (Por Hora)</h3>
+                        <canvas id="graficaHorarios" width="500" height="150"></canvas>
+                    </div>
+
+                    <div class="card">
+                        <h3>Top 5 Más Vendidos & Salidas de Caja</h3>
+                        <div id="topProductosList" class="top-list"></div>
+                        <hr class="divider">
+                        <form id="formGasto" class="form-row">
+                            <input type="text" id="gastoConcepto" placeholder="Concepto gasto (Hielo, bolsas...)" required>
+                            <input type="number" id="gastoMonto" step="0.50" placeholder="$ Monto" required class="mono">
+                            <button type="submit" class="btn btn-danger full-width" style="grid-column: span 2;">Registrar Salida de Efectivo</button>
+                        </form>
+                        <ul id="listaGastos" class="gastos-list mono"></ul>
+                    </div>
+                </div>
+
+                <div class="card" style="margin-top: 1.5rem;">
+                    <h3>Historial de Tickets Emitidos</h3>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Folio</th>
+                                    <th>Fecha / Hora</th>
+                                    <th>Método</th>
+                                    <th>Detalle</th>
+                                    <th>Total</th>
+                                    <th>Estado</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tablaHistorialBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- MÓDULO 7: CONFIGURACIÓN DE TIENDA Y RESPALDO -->
+            <section id="ajustes" class="tab-content">
+                <div class="split-grid equal-grid">
+                    <div class="card">
+                        <h3>Datos del Negocio y Ticket Térmico</h3>
+                        <form id="formConfigTienda">
+                            <div class="form-group">
+                                <label>Nombre Comercial de la Tienda</label>
+                                <input type="text" id="cfgNombre" value="ABARROTES CORE" required>
+                            </div>
+                            <div class="form-group">
+                                <label>RFC / Identificación Fiscal</label>
+                                <input type="text" id="cfgRfc" value="RFC: XAXX010101000" class="mono">
+                            </div>
+                            <div class="form-group">
+                                <label>Dirección del Local</label>
+                                <input type="text" id="cfgDireccion" value="Ecatepec de Morelos, Edo. Méx.">
+                            </div>
+                            <div class="form-group">
+                                <label>Mensaje al Pie del Ticket</label>
+                                <input type="text" id="cfgPie" value="¡GRACIAS POR SU PREFERENCIA!">
+                            </div>
+                            <button type="submit" class="btn btn-accent full-width">Guardar Identidad de Tienda</button>
+                        </form>
+                    </div>
+
+                    <div class="card">
+                        <h3>Respaldo de Base de Datos (JSON)</h3>
+                        <p class="subtitle" style="margin-bottom: 1rem;">Exporta tus 100 productos, 20 proveedores, ventas y clientes fiados en un archivo seguro.</p>
+                        <button id="btnExportarJSON" class="btn btn-success-outline full-width" style="margin-bottom: 0.75rem;">⬇ Descargar Copia de Seguridad (.JSON)</button>
+                        <label class="btn btn-outline full-width" style="text-align:center; display:block; cursor:pointer; margin-bottom: 1.5rem;">
+                            ⬆ Restaurar Copia desde Archivo (.JSON)
+                            <input type="file" id="inputImportarJSON" accept=".json" class="hidden">
+                        </label>
+                        <hr class="divider">
+                        <button id="btnReiniciarDemo" class="btn btn-danger full-width">Restaurar Catálogo Completo (100 SKUs + 20 Proveedores)</button>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- MODAL PRECIADORES / ETIQUETAS IMPRIMIBLES -->
+    <div id="modalPreciadores" class="modal hidden">
+        <div class="modal-content" style="max-width: 680px;">
+            <div class="no-print" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem; gap:0.5rem; flex-wrap:wrap;">
+                <h3>🏷️ Etiquetas de Anaquel (Preciadores)</h3>
+                <div style="display:flex; gap:0.5rem;">
+                    <button onclick="window.print()" class="btn btn-accent btn-sm">🖨️ Imprimir Etiquetas</button>
+                    <button id="btnCerrarPreciadores" class="btn btn-outline btn-sm">Cerrar</button>
+                </div>
+            </div>
+            <div id="gridPreciadores" class="preciadores-grid"></div>
+        </div>
+    </div>
+
+    <!-- MODAL RECARGAS TELEFÓNICAS -->
+    <div id="modalRecargas" class="modal hidden">
+        <div class="modal-content">
+            <h3>📱 Tiempo Aire y Recargas</h3>
+            <form id="formRecarga" style="margin-top:0.85rem;">
+                <div class="form-group">
+                    <label>Compañía Telefónica</label>
+                    <select id="recargaCompania">
+                        <option value="Telcel">Telcel</option>
+                        <option value="AT&T">AT&T</option>
+                        <option value="Movistar">Movistar</option>
+                        <option value="Unefon">Unefon</option>
+                        <option value="Bait">Bait (Walmart)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Número Celular (10 dígitos)</label>
+                    <input type="tel" id="recargaNumero" maxlength="10" required placeholder="5512345678" class="mono">
+                </div>
+                <div class="form-group">
+                    <label>Monto de Recarga</label>
+                    <select id="recargaMonto" class="mono">
+                        <option value="20">$20.00</option>
+                        <option value="30">$30.00</option>
+                        <option value="50" selected>$50.00</option>
+                        <option value="100">$100.00</option>
+                        <option value="150">$150.00</option>
+                        <option value="200">$200.00</option>
+                        <option value="500">$500.00</option>
+                    </select>
+                </div>
+                <div class="action-buttons">
+                    <button type="button" id="btnCancelarRecarga" class="btn btn-outline">Cancelar</button>
+                    <button type="submit" class="btn btn-accent">Agregar Recarga</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL ARQUEO FÍSICO DE CAJA -->
+    <div id="modalArqueo" class="modal hidden">
+        <div class="modal-content" style="max-width:460px;">
+            <h3>🧮 Arqueo de Billetes y Monedas</h3>
+            <p class="subtitle" style="margin-bottom:0.75rem;">Ingresa la cantidad de piezas físicas en el cajón:</p>
+            <div class="form-row">
+                <div class="form-group"><label>Billetes $500</label><input type="number" class="arq-input mono" data-val="500" min="0" value="0"></div>
+                <div class="form-group"><label>Billetes $200</label><input type="number" class="arq-input mono" data-val="200" min="0" value="0"></div>
+                <div class="form-group"><label>Billetes $100</label><input type="number" class="arq-input mono" data-val="100" min="0" value="0"></div>
+                <div class="form-group"><label>Billetes $50</label><input type="number" class="arq-input mono" data-val="50" min="0" value="0"></div>
+                <div class="form-group"><label>Billetes $20</label><input type="number" class="arq-input mono" data-val="20" min="0" value="0"></div>
+                <div class="form-group"><label>Monedas $10 / $5 / $2 / $1 ($ Total)</label><input type="number" class="arq-input mono" data-val="1" min="0" value="0"></div>
+            </div>
+            <div class="cambio-box">
+                <span>Conteo Físico Total:</span>
+                <strong id="lblTotalArqueo" class="mono">$0.00</strong>
+            </div>
+            <p id="lblDiferenciaArqueo" class="mono" style="margin-top:0.5rem; font-size:0.82rem; color:var(--text-secondary);">Diferencia vs Sistema: $0.00</p>
+            <button id="btnCerrarArqueo" class="btn btn-accent full-width" style="margin-top:0.85rem;">Cerrar Arqueo</button>
+        </div>
+    </div>
+
+    <!-- MODAL COMMAND PALETTE (CTRL+K) -->
+    <div id="modalCmd" class="modal hidden">
+        <div class="modal-content cmd-modal">
+            <input type="text" id="inputCmdSearch" class="cmd-input" placeholder="Escribe un comando o módulo (ej. Recarga, Corte Z, Arqueo)...">
+            <div id="listaComandos" class="cmd-list"></div>
+        </div>
+    </div>
+
+    <!-- MODAL ARTÍCULO VARIOS -->
+    <div id="modalVentaLibre" class="modal hidden">
+        <div class="modal-content">
+            <h3>Cobrar Artículo Varios / Suelto</h3>
+            <form id="formVentaLibre" style="margin-top:0.85rem;">
+                <div class="form-group">
+                    <label>Descripción rápida</label>
+                    <input type="text" id="libreNombre" value="Artículo Varios" required>
+                </div>
+                <div class="form-group">
+                    <label>Importe ($)</label>
+                    <input type="number" id="librePrecio" step="0.50" required placeholder="0.00" class="mono">
+                </div>
+                <div class="action-buttons">
+                    <button type="button" id="btnCancelarLibre" class="btn btn-outline">Cancelar</button>
+                    <button type="submit" class="btn btn-accent">Agregar al Ticket</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL ESCÁNER DE CÁMARA -->
+    <div id="modalCamara" class="modal hidden">
+        <div class="modal-content">
+            <h3>Escáner Óptico de Código de Barras</h3>
+            <p class="subtitle" style="margin-bottom:0.75rem;">Apunta el código del producto frente a la cámara.</p>
+            <div class="camera-box">
+                <video id="videoScanner" autoplay playsinline></video>
+                <div class="scan-laser"></div>
+            </div>
+            <p id="statusCamara" class="mono" style="font-size:0.75rem; color:var(--accent); margin-top:0.6rem;">Iniciando lente...</p>
+            <button id="btnCerrarCamara" class="btn btn-outline full-width" style="margin-top:0.8rem;">Cerrar Cámara</button>
+        </div>
+    </div>
+
+    <!-- MODAL BÁSCULA GRANEL -->
+    <div id="modalGranel" class="modal hidden">
+        <div class="modal-content">
+            <h3 id="modalGranelTitulo">Producto a Granel</h3>
+            <p id="modalGranelPrecio" class="subtitle mono"></p>
+            <div class="quick-bills" style="grid-template-columns: repeat(4, 1fr); margin: 0.8rem 0;">
+                <button type="button" class="bill-btn peso-btn mono" data-kg="0.250">250 g</button>
+                <button type="button" class="bill-btn peso-btn mono" data-kg="0.500">500 g</button>
+                <button type="button" class="bill-btn peso-btn mono" data-kg="0.750">750 g</button>
+                <button type="button" class="bill-btn peso-btn mono" data-kg="1.000">1.0 Kg</button>
+            </div>
+            <div class="form-group">
+                <label>Peso en Kilogramos (Kg)</label>
+                <input type="number" id="inputPesoKg" step="0.025" value="0.500" class="mono">
+            </div>
+            <div class="cambio-box" style="margin-bottom: 1rem;">
+                <span>Subtotal calculado:</span>
+                <strong id="granelSubtotalPreview" class="mono">$0.00</strong>
+            </div>
+            <div class="action-buttons">
+                <button id="btnCancelarGranel" class="btn btn-outline">Cancelar</button>
+                <button id="btnConfirmarGranel" class="btn btn-accent">Agregar al Ticket</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL ESTADO DE CUENTA FIADO -->
+    <div id="modalEstadoCuenta" class="modal hidden">
+        <div class="modal-content" style="max-width: 480px;">
+            <h3 id="ecTituloCliente">Estado de Cuenta</h3>
+            <p id="ecResumenSaldo" class="subtitle mono" style="margin-bottom: 0.8rem;"></p>
+            <div class="table-container" style="max-height: 220px; margin-bottom: 1rem;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Movimiento</th>
+                            <th>Monto</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ecTablaMovimientos"></tbody>
+                </table>
+            </div>
+            <div class="action-buttons">
+                <button id="btnCerrarEC" class="btn btn-outline">Cerrar</button>
+                <button id="btnWhatsAppEC" class="btn btn-success">📲 Enviar Recordatorio WhatsApp</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL ORDEN DE SURTIDO -->
+    <div id="modalOrdenCompra" class="modal hidden">
+        <div class="modal-content" style="max-width: 500px;">
+            <h3>Orden de Reorden Inteligente</h3>
+            <textarea id="textoOrdenCompra" rows="11" readonly class="mono orden-textarea"></textarea>
+            <div class="action-buttons">
+                <button id="btnCerrarOrden" class="btn btn-outline">Cerrar</button>
+                <button id="btnCopiarOrden" class="btn btn-accent">Copiar Lista</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL TICKET TÉRMICO -->
+    <div id="modalTicket" class="modal hidden">
+        <div class="modal-content ticket-modal">
+            <div class="thermal-paper" id="contenidoTicket">
+                <h3 id="tckTituloEmpresa">ABARROTES CORE</h3>
+                <p id="tckRfcEmpresa" style="text-align:center;">RFC: XAXX010101000</p>
+                <p id="tckDirEmpresa" style="text-align:center;">Ecatepec de Morelos, Edo. Méx.</p>
+                <hr>
+                <p id="tckFolio"></p>
+                <p id="tckFecha"></p>
+                <p id="tckOperador"></p>
+                <p id="tckCliente"></p>
+                <hr>
+                <div id="tckItems"></div>
+                <hr>
+                <p id="tckDescuento"></p>
+                <p id="tckTotal" class="tck-total"></p>
+                <p id="tckPago"></p>
+                <hr>
+                <p id="tckPie" style="text-align:center; font-size:0.75rem;">¡GRACIAS POR SU PREFERENCIA!</p>
+            </div>
+            <div class="action-buttons" style="margin-top: 1rem;">
+                <button id="btnCerrarTicket" class="btn btn-outline">Cerrar</button>
+                <button id="btnEnviarTicketWhatsApp" class="btn btn-success">📲 WhatsApp</button>
+                <button onclick="window.print()" class="btn btn-accent">Imprimir</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast hidden"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
